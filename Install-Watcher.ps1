@@ -4,6 +4,8 @@
 [CmdletBinding()]
 param(
     [string]$TaskName = 'ChatGPT Overlay Fix Watcher',
+    [ValidateRange(1, 1440)]
+    [int]$RecoveryIntervalMinutes = 5,
     [switch]$DoNotStart
 )
 
@@ -19,7 +21,11 @@ $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"
 $userId = '{0}\{1}' -f $env:USERDOMAIN, $env:USERNAME
 
 $action = New-ScheduledTaskAction -Execute $powerShellPath -Argument $arguments
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+$logonTrigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+$recoveryTrigger = New-ScheduledTaskTrigger `
+    -Once `
+    -At (Get-Date).AddMinutes($RecoveryIntervalMinutes) `
+    -RepetitionInterval (New-TimeSpan -Minutes $RecoveryIntervalMinutes)
 $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -31,7 +37,7 @@ $settings = New-ScheduledTaskSettingsSet `
 
 $task = New-ScheduledTask `
     -Action $action `
-    -Trigger $trigger `
+    -Trigger @($logonTrigger, $recoveryTrigger) `
     -Principal $principal `
     -Settings $settings `
     -Description 'Automatically refreshes newly created ChatGPT/Codex Pet and Voice overlay windows.'
@@ -45,6 +51,14 @@ $hasLogonTrigger = $registeredTask.Triggers | Where-Object {
 
 if (-not $hasLogonTrigger) {
     throw "Scheduled task verification failed: $TaskName has no logon trigger."
+}
+
+$hasRecoveryTrigger = $registeredTask.Triggers | Where-Object {
+    $_.CimClass.CimClassName -eq 'MSFT_TaskTimeTrigger' -and $_.Repetition.Interval
+}
+
+if (-not $hasRecoveryTrigger) {
+    throw "Scheduled task verification failed: $TaskName has no repeating recovery trigger."
 }
 
 $registeredAction = $registeredTask.Actions | Select-Object -First 1
@@ -71,6 +85,7 @@ if (-not $DoNotStart) {
 Write-Host "Installed scheduled task: $TaskName" -ForegroundColor Green
 Write-Host "Task state: $($registeredTask.State)"
 Write-Host 'Startup: current-user logon (hidden window, limited privileges)'
+Write-Host "Self-recovery: every $RecoveryIntervalMinutes minute(s) if the watcher is not running"
 Write-Host "Watcher script: $watcherPath"
 Write-Host "Log file: $env:LOCALAPPDATA\ChatGPTOverlayFix\watcher.log"
 Write-Host 'Run Uninstall-Watcher.ps1 to remove the scheduled task.'

@@ -98,6 +98,11 @@ again when that user logs on. The task launches PowerShell with a hidden window,
 so no PowerShell console needs to remain open. It does not request administrator
 privileges.
 
+The task also has a repeating five-minute recovery trigger. If the background
+watcher is interrupted, Task Scheduler starts it again at the next recovery
+interval. While the watcher is already running, the `IgnoreNew` policy prevents
+duplicate instances.
+
 The installer verifies that the saved task has the expected logon trigger and
 launch command. Unless `-DoNotStart` is used, it also waits for the task to reach
 the `Running` state and reports an error if the watcher exits immediately.
@@ -112,6 +117,14 @@ Get-ScheduledTask -TaskName 'ChatGPT Overlay Fix Watcher' |
 After restarting the PC, the watcher starts automatically at the next Windows
 logon. Keep the repository folder at the same path because the scheduled task
 launches `Watch-ChatGPT-Overlays.ps1` from that location.
+
+To use a different recovery interval, reinstall with a value from 1 to 1440
+minutes:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Install-Watcher.ps1" `
+    -RecoveryIntervalMinutes 2
+```
 
 To start the watcher manually in a visible console instead, run:
 

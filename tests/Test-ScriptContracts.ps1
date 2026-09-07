@@ -48,6 +48,12 @@ if ($installContent -notmatch 'RunLevel Limited') {
 if ($installContent -notmatch 'MSFT_TaskLogonTrigger') {
     throw 'The installer must verify the current-user logon trigger.'
 }
+if ($installContent -notmatch 'MSFT_TaskTimeTrigger') {
+    throw 'The installer must verify the repeating self-recovery trigger.'
+}
+if ($installContent -notmatch 'RecoveryIntervalMinutes') {
+    throw 'The installer must expose the self-recovery interval.'
+}
 if ($installContent -notmatch "State -ne 'Running'") {
     throw 'The installer must verify that the watcher remains running.'
 }
